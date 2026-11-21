@@ -356,6 +356,13 @@ fn get_app_handle() -> Option<AppHandle> {
 pub fn init_watcher_hub(app: AppHandle) {
     let cell = GLOBAL_APP.get_or_init(|| Mutex::new(None));
     *cell.lock() = Some(app);
+    start_watcher_engine();
+}
+
+/// Start the watcher engine without a Tauri AppHandle (Slint pure-daemon path).
+/// Actions that emit on the Tauri bus skip emission when no handle is bound;
+/// native actions and the native-wry/Slint broadcasts work regardless.
+pub fn start_watcher_engine() {
     load_persistent_custom_watchers();
     start_background_process_watcher();
 }

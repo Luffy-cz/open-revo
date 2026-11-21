@@ -479,7 +479,16 @@ fn run_slint_pure_daemon() {
     crate::system::telemetry::start_telemetry_loop(None, ec_for_telemetry, gpu_for_telemetry);
 
     // 14. Watcher Hub & Enabled Plugins Bootstrap
+    crate::system::watcher_hub::start_watcher_engine();
     crate::commands::system_cmd::bootstrap_enabled_plugins();
+
+    // Startup assertion must land after the native hardware-state restore's
+    // delayed battery re-assert (~5s into boot), which resets the EC gate and
+    // would otherwise undo the plugin pin immediately after it is applied.
+    std::thread::spawn(|| {
+        std::thread::sleep(std::time::Duration::from_millis(6000));
+        crate::system::watcher_hub::trigger_startup_watchers();
+    });
 
     // 15. Autostart Alignment
     crate::system::autostart::sync_autostart_target_path();
