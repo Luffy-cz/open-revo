@@ -483,10 +483,11 @@ fn run_slint_pure_daemon() {
     crate::commands::system_cmd::bootstrap_enabled_plugins();
 
     // Startup assertion must land after the native hardware-state restore's
-    // delayed battery re-assert (~5s into boot), which resets the EC gate and
-    // would otherwise undo the plugin pin immediately after it is applied.
+    // delayed battery re-assert, which resets the EC gate and would otherwise
+    // undo the plugin pin. The re-assert spawns near the end of the restore
+    // thread and fires 2.5s later (~7s into boot observed on a cold boot).
     std::thread::spawn(|| {
-        std::thread::sleep(std::time::Duration::from_millis(6000));
+        std::thread::sleep(std::time::Duration::from_millis(8000));
         crate::system::watcher_hub::trigger_startup_watchers();
     });
 
