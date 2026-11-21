@@ -1,7 +1,7 @@
 {
   "id": "battery-hardware-limit",
   "name": "电池充电上限守护者",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "author": "OpenRevo Official & Community",
   "description": "官方演示插件：基于微内核硬件网关的多协议底层限充调控中心，支持同方门控持续钉住法(Pin & Keep-Alive)与传统脉冲存储法，自适应0x04/0x05硬件门控探测，自由设定 1~100% 充电阈值。",
   "type": "tab",
@@ -26,12 +26,13 @@
   },
   "watchers": [
     {
-      "id": "battery-limit-startup-guard",
-      "name": "微内核开机限充断言守护 (声明式底层动作)",
+      "id": "battery-limit-ac-reconnect-guard",
+      "name": "微内核电源重连限充断言守护 (声明式底层动作)",
       "enabled": true,
       "cooldown_ms": 3000,
       "when": {
-        "type": "startup"
+        "type": "power_event",
+        "event": "ac_connected"
       },
       "actions": [
         {
@@ -46,7 +47,7 @@
         },
         {
           "action": "delay_ms",
-          "duration": 200
+          "value": 200
         },
         {
           "action": "raw_ec_write",
@@ -57,12 +58,12 @@
     },
     {
       "id": "battery-limit-gate-keepalive",
-      "name": "门控持续保持心跳 (Pin & Keep-Alive)",
+      "name": "门控持续保持心跳 (Pin & Keep-Alive，仅接电源时生效)",
       "enabled": true,
-      "cooldown_ms": 0,
+      "cooldown_ms": 4000,
       "when": {
-        "type": "interval",
-        "every_ms": 4000
+        "type": "telemetry",
+        "is_ac_online": true
       },
       "actions": [
         {
@@ -74,6 +75,15 @@
           "action": "raw_ec_write",
           "address": "0x07C3",
           "value": 4
+        },
+        {
+          "action": "delay_ms",
+          "value": 200
+        },
+        {
+          "action": "raw_ec_write",
+          "address": "0x07B9",
+          "value": 80
         }
       ]
     }

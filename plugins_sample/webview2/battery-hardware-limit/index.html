@@ -1085,6 +1085,7 @@
       if (STATE.isLimitActive && STATE.currentTarget < 100 && STATE.mode === 'pin') {
         startKeepAlive();
       }
+      syncWatcherToHost();
     }
 
     async function loadPluginStorage() {
@@ -1177,13 +1178,14 @@
         const gateVal = STATE.activeGateVal || 4;
 
         const watcherDef = {
-          id: 'battery-limit-startup-guard',
-          name: '微内核开机限充断言守护 (声明式底层动作)',
+          id: 'battery-limit-ac-reconnect-guard',
+          name: '微内核电源重连限充断言守护 (声明式底层动作)',
           plugin_id: 'battery-hardware-limit',
           enabled: isEnabled,
           cooldown_ms: 3000,
           condition: {
-            type: 'startup'
+            type: 'power_event',
+            event: 'ac_connected'
           },
           actions: [
             {
@@ -1195,19 +1197,28 @@
               action: 'raw_ec_write',
               address: STATE.gateReg,
               value: gateVal
+            },
+            {
+              action: 'delay_ms',
+              value: 200
+            },
+            {
+              action: 'raw_ec_write',
+              address: STATE.limitReg,
+              value: STATE.currentTarget
             }
           ]
         };
 
         const keepaliveWatcherDef = {
           id: 'battery-limit-gate-keepalive',
-          name: '门控持续保持心跳 (Pin & Keep-Alive)',
+          name: '门控持续保持心跳 (Pin & Keep-Alive，仅接电源时生效)',
           plugin_id: 'battery-hardware-limit',
           enabled: isEnabled && STATE.mode === 'pin',
-          cooldown_ms: 0,
+          cooldown_ms: Number(STATE.keepaliveIntervalMs) || 4000,
           condition: {
-            type: 'interval',
-            every_ms: Number(STATE.keepaliveIntervalMs) || 4000
+            type: 'telemetry',
+            is_ac_online: true
           },
           actions: [
             {
@@ -1219,6 +1230,15 @@
               action: 'raw_ec_write',
               address: STATE.gateReg,
               value: gateVal
+            },
+            {
+              action: 'delay_ms',
+              value: 200
+            },
+            {
+              action: 'raw_ec_write',
+              address: STATE.limitReg,
+              value: STATE.currentTarget
             }
           ]
         };
@@ -1230,8 +1250,8 @@
           await window.parent.__OPENREVO_BRIDGE__.registerWatcher(watcherDef);
           await window.parent.__OPENREVO_BRIDGE__.registerWatcher(keepaliveWatcherDef);
         } else {
-          await rpc('register_custom_watcher', { watcher: watcherDef }).catch(() => { });
-          await rpc('register_custom_watcher', { watcher: keepaliveWatcherDef }).catch(() => { });
+          await rpc('register_watcher', watcherDef).catch(() => { });
+          await rpc('register_watcher', keepaliveWatcherDef).catch(() => { });
         }
       } catch (e) {
         console.warn('[BatteryLimit] 同步 Watcher 到宿主事件中心失败:', e);
@@ -1799,6 +1819,7 @@
     window.addEventListener('DOMContentLoaded', async () => {
       initBatteryProbe();
       await loadPluginStorage();
+      await syncWatcherToHost();
       await refreshHardwareState();
 
       window.addEventListener('message', (e) => {
